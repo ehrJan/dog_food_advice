@@ -1,5 +1,4 @@
 logging
-os
 tempfile # To handle temporary file saving for uploads
 pandas
 PIL

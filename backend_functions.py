@@ -5,7 +5,6 @@ import json
 import os
 import google.generativeai as genai
 import textwrap
-from dotenv import load_dotenv
 import streamlit as st
 
 

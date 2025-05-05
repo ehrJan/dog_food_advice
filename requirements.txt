@@ -1,5 +1,5 @@
 pandas
-PIL
+Pillow
 zbar
 pyzbar
 requests # Library to send HTTP requests - asking web server for data

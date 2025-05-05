@@ -6,6 +6,7 @@ import os
 import google.generativeai as genai
 import textwrap
 from dotenv import load_dotenv
+import streamlit as st
 
 
 def load_image(path_image):
@@ -91,10 +92,7 @@ class ai_agent:
         self.model=genai.GenerativeModel(self.model_type)
 
     def get_gemini_api_key(self,key="gemini_api"):
-        load_dotenv(self.PATH_ENV)
-        api_key=os.getenv(key) 
-
-        return api_key
+        return st.secrets[key]
 
     def create_prompt_string(self,food_dict,dog_dict):
         content_generation_string=self.base_prompt

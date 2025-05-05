@@ -1,7 +1,7 @@
 logging
 os
 tempfile # To handle temporary file saving for uploads
-pandas Import Pandas for DataFrame
+pandas
 PIL 
 pyzbar
 requests # Library to send HTTP requests - asking web server for data

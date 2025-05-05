@@ -1,6 +1,6 @@
 pandas
 Pillow
-zbar
+pyzbar
 pyzbar
 requests # Library to send HTTP requests - asking web server for data
 google.generativeai

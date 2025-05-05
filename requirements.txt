@@ -1,9 +1,6 @@
-logging
-tempfile # To handle temporary file saving for uploads
 pandas
 PIL
 zbar
 pyzbar
 requests # Library to send HTTP requests - asking web server for data
-json
 google.generativeai

@@ -1,9 +1,13 @@
 import streamlit as st
 import logging
-import datetime
+import tempfile
+import pandas as pd
 import os
-import tempfile # To handle temporary file saving for uploads
-import pandas as pd # Import Pandas for DataFrame
+
+# --- Define the Correct Password ---
+# For Streamlit Cloud, it will use st.secrets. For local, it falls back to os.getenv
+# Ensure APP_PASSWORD is set in your Streamlit Cloud secrets or local .env file
+CORRECT_PASSWORD = st.secrets["APP_PASSWORD"]
 
 # --- Import your backend functions ---
 try:
@@ -13,28 +17,19 @@ except ImportError as e:
     st.error("Make sure 'backend_functions.py' is in the same directory as this script.")
     st.stop()
 
-# --- Dependencies Note ---
-# Make sure you have installed all required libraries:
-# pip install streamlit pandas Pillow pyzbar requests python-dotenv google-generativeai
-
-# --- Environment Note ---
-# Expects a .env file (e.g., 'keys.env') containing GEMINI_API_KEY
-
 # --- Initialize AI Agent ---
 try:
     ai_model = ai_agent()
 except Exception as e:
     st.error(f"Error initializing AI Agent: {e}")
-    st.error("Please ensure your API key is configured correctly in the .env file.")
+    st.error("Please ensure your API key is configured correctly.")
     st.stop()
 
-# --- Logging Setup ---
+# --- Logging Setup (remains the same) ---
 LOG_DIR = "logs"
 LOG_FILE = os.path.join(LOG_DIR, "app_log.log")
-
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -44,7 +39,6 @@ logging.basicConfig(
 )
 
 def log_interaction(barcode, dog_info, nutrition_data, recommendation):
-    """Logs the user input and the generated output."""
     log_message = (
         f"Interaction Log:\n"
         f"\tBarcode: {barcode}\n"
@@ -54,114 +48,77 @@ def log_interaction(barcode, dog_info, nutrition_data, recommendation):
     )
     logging.info(log_message)
 
-# === Helper function to process image input (from upload or camera) ===
+# === Helper function to process image input (remains the same) ===
 def process_image_input(image_file_like_object):
-    """Scans barcode from an uploaded file or camera input."""
     barcode = None
     temp_image_path = None
     try:
-        # Save image data temporarily to pass its path to the backend function
-        # Give it a reasonable suffix, though backend_functions handles image type.
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
             tmp_file.write(image_file_like_object.getvalue())
-            temp_image_path = tmp_file.name # Get the path to the temporary file
-
-        # Call the backend function with the temporary file path
+            temp_image_path = tmp_file.name
         barcode = scan_barcode_from_image(temp_image_path)
-
         if not barcode:
             st.error("Could not detect a barcode in the image. Please try entering it manually.")
         else:
             st.success(f"Detected Barcode: {barcode}")
-            return barcode # Return barcode if found
-
+            return barcode
     except Exception as e:
         st.error(f"Error processing image: {e}")
     finally:
-        # Clean up the temporary file
         if temp_image_path and os.path.exists(temp_image_path):
             os.remove(temp_image_path)
-    return None # Return None if barcode not found or error occurred
-
+    return None
 
 # --- Streamlit App Layout ---
 st.set_page_config(page_title="Dog Food Analyzer AI", layout="wide")
-
 st.title("🐾 Dog Food Analyzer & AI Recommender")
 st.markdown("Scan a food barcode, take a photo, or enter it manually. Provide your dog's details for AI-powered feeding recommendations.")
 
 input_col, output_col = st.columns(2)
 
-# --- Input Column ---
 with input_col:
     st.header("1. Food Barcode")
     barcode_source = st.radio(
         "Select Barcode Source:",
-        ('Upload Image', 'Enter Manually', 'Take Photo (Webcam)'), # Added Webcam option
+        ('Upload Image', 'Enter Manually', 'Take Photo (Webcam)'),
         key='barcode_source_radio',
-        horizontal=True # Make radio buttons horizontal if preferred
+        horizontal=True
     )
-
     uploaded_file = None
     manual_barcode = ""
-    camera_photo = None # Variable for camera input
-
+    camera_photo = None
     if barcode_source == 'Upload Image':
-        uploaded_file = st.file_uploader(
-            "Upload an image of the barcode:",
-            type=["png", "jpg", "jpeg"],
-            key='barcode_uploader'
-        )
+        uploaded_file = st.file_uploader("Upload an image of the barcode:", type=["png", "jpg", "jpeg"], key='barcode_uploader')
     elif barcode_source == 'Take Photo (Webcam)':
-        camera_photo = st.camera_input( # Use camera input widget
-            "Point camera at barcode and take photo:",
-            key='barcode_camera'
-        )
-    else: # Enter Manually
-        manual_barcode = st.text_input(
-            "Enter Barcode Number:",
-            key='manual_barcode_input',
-            placeholder="e.g., 0001234567890"
-        )
+        camera_photo = st.camera_input("Point camera at barcode and take photo:", key='barcode_camera')
+    else:
+        manual_barcode = st.text_input("Enter Barcode Number:", key='manual_barcode_input', placeholder="e.g., 0001234567890")
 
     st.divider()
-
     st.header("2. Your Dog's Details")
-
     dog_breed = st.text_input("Breed:", key='dog_breed', placeholder="e.g., Labrador Retriever")
     dog_weight = st.number_input("Weight (kg):", min_value=0.1, max_value=100.0, step=0.5, value=10.0, key='dog_weight')
     dog_age = st.number_input("Age (years):", min_value=0.1, max_value=30.0, step=0.5, value=1.0, key='dog_age')
     dog_activity = st.selectbox(
         "Activity Level:",
-        ('Low (Less than 1 hour exercise/day)',
-         'Moderate (1-2 hours exercise/day)',
-         'High (More than 2 hours exercise/day)',
-         'Working/Very High'),
+        ('Low (Less than 1 hour exercise/day)', 'Moderate (1-2 hours exercise/day)', 'High (More than 2 hours exercise/day)', 'Working/Very High'),
         key='dog_activity'
     )
-    dog_allergies_str = st.text_input(
-        "Known Allergies (comma-separated):",
-        key='dog_allergies',
-        placeholder="e.g., chicken, beef, grain (Leave blank if none)"
-    )
-    dog_additional_info = st.text_area(
-        "Additional Information (Optional):",
-        key='dog_additional_info',
-        placeholder="e.g., Sensitive stomach, specific health conditions..."
-    )
+    dog_allergies_str = st.text_input("Known Allergies (comma-separated):", key='dog_allergies', placeholder="e.g., chicken, beef, grain (Leave blank if none)")
+    dog_additional_info = st.text_area("Additional Information (Optional):", key='dog_additional_info', placeholder="e.g., Sensitive stomach...")
+
+    # --- Add Password Field ---
+    app_password_input = st.text_input("Enter Password to Get AI Recommendation:", type="password", key="app_password_input")
+    # --- End Password Field ---
 
     st.divider()
-
     submit_button = st.button("Get Recommendation", key='submit_button', type="primary")
 
 # --- Output Column ---
 with output_col:
     st.header("Analysis & Recommendation")
-
     if submit_button:
         barcode_to_process = None
-
-        # --- Input Processing ---
         with st.spinner('Processing barcode input...'):
             if uploaded_file is not None:
                 barcode_to_process = process_image_input(uploaded_file)
@@ -173,25 +130,18 @@ with output_col:
             else:
                 st.warning("Please provide a barcode via image upload, webcam, or manual entry.")
 
-        # --- Data Fetching and AI Call ---
         if barcode_to_process:
-            # Prepare dog info dictionary
             dog_allergies_list = [allergy.strip() for allergy in dog_allergies_str.split(',') if allergy.strip()]
             dog_info_dict = {
-                "breed": dog_breed,
-                "age": dog_age,
-                "weight_kg": dog_weight,
-                "activity": dog_activity,
-                "allergies": dog_allergies_list,
+                "breed": dog_breed, "age": dog_age, "weight_kg": dog_weight,
+                "activity": dog_activity, "allergies": dog_allergies_list,
                 "additional_info": dog_additional_info
             }
-
             if not dog_breed or not dog_age or not dog_weight:
                  st.warning("Please provide at least the dog's breed, age, and weight for better recommendations.")
 
             nutrition_info = None
             ai_recommendation = None
-
             with st.spinner(f'Fetching nutrition data for {barcode_to_process}...'):
                 try:
                     nutrition_info = get_nutrition_data(barcode_to_process)
@@ -201,47 +151,44 @@ with output_col:
             if nutrition_info:
                 st.subheader("Nutrition Information")
                 display_info = {k: v for k, v in nutrition_info.items() if v is not None}
-
-                # --- Create and display DataFrame ---
                 try:
-                    # Convert dict to DataFrame, using items for Attribute/Value columns
                     df_nutrition = pd.DataFrame(display_info.items(), columns=['Nutrient / Fact', 'Value'])
                     st.dataframe(df_nutrition, use_container_width=True, hide_index=True)
-                    # Use st.table(df_nutrition) for a static table if preferred
                 except Exception as e:
                     st.error(f"Could not display nutrition data as table: {e}")
-                    st.json(display_info) # Fallback to JSON if DataFrame fails
-                # --- End of DataFrame display ---
+                    st.json(display_info)
 
-
-                with st.spinner('Generating AI recommendation...'):
-                    try:
-                        ai_recommendation = ai_model.create_response(nutrition_info, dog_info_dict)
-                        # --- Changed Subheader ---
-                        st.subheader("AI Veterinarian Recommendation")
-                        st.markdown(ai_recommendation)
-                    except Exception as e:
-                        st.error(f"Error generating AI recommendation: {e}")
-
-                if ai_recommendation:
-                    try:
-                         log_interaction(barcode_to_process, dog_info_dict, nutrition_info, ai_recommendation)
-                         st.info("Interaction logged successfully.")
-                    except Exception as e:
-                         st.error(f"Failed to log interaction: {e}")
+                # --- Password Check before AI Call ---
+                if not CORRECT_PASSWORD:
+                    st.error("Application password is not configured by the administrator. AI recommendations disabled.")
+                elif app_password_input == CORRECT_PASSWORD:
+                    with st.spinner('Generating AI recommendation...'):
+                        try:
+                            ai_recommendation = ai_model.create_response(nutrition_info, dog_info_dict)
+                            st.subheader("AI Veterinarian Recommendation")
+                            st.markdown(ai_recommendation)
+                        except Exception as e:
+                            st.error(f"Error generating AI recommendation: {e}")
+                    if ai_recommendation:
+                        try:
+                             log_interaction(barcode_to_process, dog_info_dict, nutrition_info, ai_recommendation)
+                             st.info("Interaction logged successfully.")
+                        except Exception as e:
+                             st.error(f"Failed to log interaction: {e}")
+                elif app_password_input: # If password was entered but is wrong
+                    st.error("Incorrect password. AI recommendation will not be generated.")
+                else: # If password field was left blank
+                    st.warning("Password required to generate AI recommendation.")
+                # --- End Password Check ---
 
             elif not nutrition_info and barcode_to_process:
                 st.error(f"Could not find nutrition information for barcode: {barcode_to_process}")
-
         elif not any([uploaded_file, camera_photo, manual_barcode]):
-             # Error message already shown if no input method was chosen AND button clicked
-             pass # Avoid showing duplicate warnings if no input selected yet
-
+             pass
     else:
         st.info("Provide food barcode, your dog's details, then click 'Get Recommendation'.")
 
-# --- Optional: Display Log File Content ---
-# (Code remains the same)
+# --- Optional: Display Log File Content (remains the same) ---
 st.divider()
 show_log = st.expander("Show Application Log (for debugging)")
 with show_log:

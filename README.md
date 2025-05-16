@@ -8,5 +8,10 @@ streamlit run streamline.py
 The needed packages are:
 streamlit Pillow pyzbar requests python-dotenv google-generativeai
 
+The website can be found at: https://dogfoodadvice.streamlit.app/
+The github is: https://github.com/ehrJan/dog_food_advice
+
+
+
 
 

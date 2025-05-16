@@ -48,7 +48,6 @@ def log_interaction(barcode, dog_info, nutrition_data, recommendation):
     )
     logging.info(log_message)
 
-# === Helper function to process image input (remains the same) ===
 def process_image_input(image_file_like_object):
     barcode = None
     temp_image_path = None
@@ -69,7 +68,7 @@ def process_image_input(image_file_like_object):
             os.remove(temp_image_path)
     return None
 
-# --- Streamlit App Layout ---
+
 st.set_page_config(page_title="Dog Food Analyzer AI", layout="wide")
 st.title("🐾 Dog Food Analyzer & AI Recommender")
 st.markdown("Scan a food barcode, take a photo, or enter it manually. Provide your dog's details for AI-powered feeding recommendations.")
@@ -153,6 +152,9 @@ with output_col:
                 display_info = {k: v for k, v in nutrition_info.items() if v is not None}
                 try:
                     df_nutrition = pd.DataFrame(display_info.items(), columns=['Nutrient / Fact', 'Value'])
+                    df_nutrition = df_nutrition[df_nutrition['Nutrient / Fact'] != 'schema_version'].copy()
+                    if 'Value' in df_nutrition.columns: # Check if 'Value' column exists
+                        df_nutrition['Value'] = df_nutrition['Value'].astype(str)
                     st.dataframe(df_nutrition, use_container_width=True, hide_index=True)
                 except Exception as e:
                     st.error(f"Could not display nutrition data as table: {e}")
